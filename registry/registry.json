@@ -1,0 +1,490 @@
+[
+  {
+    "id": "pre-bash-secret-detection",
+    "slug": "pre-bash-secret-detection",
+    "name": "Détection de secrets avant exécution Bash",
+    "category": "security",
+    "provider": ["claude-code"],
+    "hook_type": "PreToolUse",
+    "trigger": "Bash",
+    "description": "Intercepte toute commande shell et analyse la commande pour détecter des clés API, tokens ou mots de passe en clair avant exécution. Bloque la commande si un pattern de secret est trouvé.",
+    "use_cases": ["Protection de credentials", "Audit DevSecOps", "Prévention de fuites en CI/CD"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PreToolUse": [
+            {
+              "matcher": "Bash",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/detect-secrets.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/detect-secrets.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\ncommand=$(echo \"$input\" | jq -r '.tool_input.command // \"\"')\nif echo \"$command\" | grep -qiE '(sk-[a-z0-9]{20,}|ghp_[a-z0-9]{36}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----|password=)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Secret potentiel détecté dans la commande shell.\"}}'\n  exit 0\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["security", "bash", "secrets", "devsecops"],
+    "votes": 0
+  },
+  {
+    "id": "pre-bash-block-destructive",
+    "slug": "pre-bash-block-destructive",
+    "name": "Blocage des commandes destructives",
+    "category": "security",
+    "provider": ["claude-code"],
+    "hook_type": "PreToolUse",
+    "trigger": "Bash",
+    "description": "Bloque les commandes shell potentiellement destructives (rm -rf /, mkfs, dd vers un disque, git reset --hard sur des paths sensibles) avant qu'elles ne soient exécutées par l'agent.",
+    "use_cases": ["Garde-fou sur poste de dev", "Prévention de perte de données", "Environnements partagés"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PreToolUse": [
+            {
+              "matcher": "Bash",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/block-destructive.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/block-destructive.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\ncommand=$(echo \"$input\" | jq -r '.tool_input.command // \"\"')\nif echo \"$command\" | grep -qiE '(rm[[:space:]]+-rf[[:space:]]+/|mkfs|dd[[:space:]]+if=.*of=/dev/|:\\(\\)\\{|chmod[[:space:]]+-R[[:space:]]+777[[:space:]]+/)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Commande destructive bloquée par le hook de sécurité.\"}}'\n  exit 0\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["security", "bash", "safety", "guardrail"],
+    "votes": 0
+  },
+  {
+    "id": "pre-edit-protect-paths",
+    "slug": "pre-edit-protect-paths",
+    "name": "Protection des fichiers sensibles en écriture",
+    "category": "security",
+    "provider": ["claude-code"],
+    "hook_type": "PreToolUse",
+    "trigger": "Write|Edit",
+    "description": "Empêche l'agent de modifier des fichiers sensibles (.env, secrets, clés privées, lockfiles CI) en interceptant les outils Write et Edit et en vérifiant le chemin cible.",
+    "use_cases": ["Protection de configuration", "Conformité", "Intégrité des secrets locaux"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PreToolUse": [
+            {
+              "matcher": "Write|Edit",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/protect-paths.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/protect-paths.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\npath=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif echo \"$path\" | grep -qiE '(\\.env($|\\.)|/secrets/|\\.pem$|id_rsa|credentials)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Fichier protégé — édition refusée par le hook.\"}}'\n  exit 0\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["security", "files", "protection", "secrets"],
+    "votes": 0
+  },
+  {
+    "id": "pre-bash-guard-git-push-main",
+    "slug": "pre-bash-guard-git-push-main",
+    "name": "Garde-fou git push vers main",
+    "category": "security",
+    "provider": ["claude-code"],
+    "hook_type": "PreToolUse",
+    "trigger": "Bash",
+    "description": "Détecte les commandes git push directes vers main/master et les bloque pour forcer le passage par une branche et une pull request.",
+    "use_cases": ["Discipline de branche", "Protection de la branche principale", "Workflow GitFlow"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PreToolUse": [
+            {
+              "matcher": "Bash",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-push-main.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/guard-push-main.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\ncommand=$(echo \"$input\" | jq -r '.tool_input.command // \"\"')\nif echo \"$command\" | grep -qiE 'git[[:space:]]+push.*(origin[[:space:]]+(main|master)|--force)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Push direct vers main/master ou force-push — confirmation requise.\"}}'\n  exit 0\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["security", "git", "workflow", "guardrail"],
+    "votes": 0
+  },
+  {
+    "id": "user-prompt-inject-conventions",
+    "slug": "user-prompt-inject-conventions",
+    "name": "Injection des conventions du projet",
+    "category": "context",
+    "provider": ["claude-code"],
+    "hook_type": "UserPromptSubmit",
+    "trigger": "*",
+    "description": "À chaque prompt utilisateur, injecte automatiquement les conventions du projet (stack, règles de style, contraintes) en lisant un fichier de conventions, afin que l'agent reste aligné sans rappel manuel.",
+    "use_cases": ["Cohérence de code", "Onboarding agent", "Standards d'équipe"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject-conventions.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/inject-conventions.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\nconv=\"$CLAUDE_PROJECT_DIR/.claude/conventions.md\"\nif [ -f \"$conv\" ]; then\n  echo \"### Conventions du projet (injectées automatiquement)\"\n  cat \"$conv\"\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["context", "conventions", "prompt", "standards"],
+    "votes": 0
+  },
+  {
+    "id": "session-start-load-git-context",
+    "slug": "session-start-load-git-context",
+    "name": "Chargement du contexte Git au démarrage",
+    "category": "context",
+    "provider": ["claude-code"],
+    "hook_type": "SessionStart",
+    "trigger": "*",
+    "description": "Au démarrage de session, injecte l'état du dépôt : branche courante, statut git, derniers commits. L'agent démarre avec une vision claire de l'état du projet.",
+    "use_cases": ["Reprise de contexte", "Awareness Git", "Sessions multiples"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/load-git-context.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/load-git-context.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$CLAUDE_PROJECT_DIR\"\necho \"### Contexte Git\"\necho \"Branche: $(git branch --show-current 2>/dev/null || echo n/a)\"\necho \"Statut:\"\ngit status --short 2>/dev/null | head -20\necho \"Derniers commits:\"\ngit log --oneline -5 2>/dev/null\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["context", "git", "session", "awareness"],
+    "votes": 0
+  },
+  {
+    "id": "user-prompt-inject-datetime",
+    "slug": "user-prompt-inject-datetime",
+    "name": "Injection de la date et heure courantes",
+    "category": "context",
+    "provider": ["claude-code"],
+    "hook_type": "UserPromptSubmit",
+    "trigger": "*",
+    "description": "Ajoute la date et l'heure actuelles au contexte de chaque prompt, ce qui évite à l'agent de raisonner avec une date de cutoff erronée.",
+    "use_cases": ["Raisonnement temporel correct", "Logs horodatés", "Changelogs"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                { "type": "command", "command": "echo \"Date/heure actuelle: $(date '+%Y-%m-%d %H:%M:%S %Z')\"" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": "",
+      "code_snippet": ""
+    },
+    "community_examples": [],
+    "tags": ["context", "datetime", "prompt"],
+    "votes": 0
+  },
+  {
+    "id": "post-write-autoformat",
+    "slug": "post-write-autoformat",
+    "name": "Formatage automatique après écriture",
+    "category": "validation",
+    "provider": ["claude-code"],
+    "hook_type": "PostToolUse",
+    "trigger": "Write|Edit",
+    "description": "Après chaque écriture ou édition de fichier, lance Prettier sur le fichier modifié pour garantir un formatage cohérent sans intervention de l'agent.",
+    "use_cases": ["Cohérence de style", "Réduction du bruit en diff", "Qualité de code"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "matcher": "Write|Edit",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/autoformat.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/autoformat.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\npath=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif [ -n \"$path\" ] && echo \"$path\" | grep -qE '\\.(ts|tsx|js|jsx|json|css|md)$'; then\n  npx prettier --write \"$path\" >/dev/null 2>&1 || true\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["validation", "prettier", "format", "quality"],
+    "votes": 0
+  },
+  {
+    "id": "post-write-eslint",
+    "slug": "post-write-eslint",
+    "name": "Lint ESLint après écriture",
+    "category": "validation",
+    "provider": ["claude-code"],
+    "hook_type": "PostToolUse",
+    "trigger": "Write|Edit",
+    "description": "Exécute ESLint sur le fichier qui vient d'être écrit et renvoie les erreurs à l'agent pour qu'il les corrige immédiatement dans la même boucle.",
+    "use_cases": ["Qualité continue", "Boucle de correction auto", "Standards lint"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "matcher": "Write|Edit",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/eslint-check.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/eslint-check.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\npath=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif [ -n \"$path\" ] && echo \"$path\" | grep -qE '\\.(ts|tsx|js|jsx)$'; then\n  out=$(npx eslint \"$path\" 2>&1) || {\n    echo \"ESLint a relevé des problèmes dans $path:\" >&2\n    echo \"$out\" >&2\n    exit 2\n  }\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["validation", "eslint", "lint", "quality"],
+    "votes": 0
+  },
+  {
+    "id": "post-edit-typecheck",
+    "slug": "post-edit-typecheck",
+    "name": "Vérification de types TypeScript",
+    "category": "validation",
+    "provider": ["claude-code"],
+    "hook_type": "PostToolUse",
+    "trigger": "Write|Edit",
+    "description": "Lance le compilateur TypeScript en mode no-emit après modification d'un fichier .ts/.tsx et remonte les erreurs de typage à l'agent.",
+    "use_cases": ["Sécurité de typage", "Détection précoce d'erreurs", "Projets TypeScript stricts"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "matcher": "Write|Edit",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/typecheck.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/typecheck.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\npath=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif echo \"$path\" | grep -qE '\\.(ts|tsx)$'; then\n  out=$(npx tsc --noEmit 2>&1) || {\n    echo \"Erreurs TypeScript:\" >&2\n    echo \"$out\" | head -30 >&2\n    exit 2\n  }\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["validation", "typescript", "typecheck", "quality"],
+    "votes": 0
+  },
+  {
+    "id": "stop-run-tests",
+    "slug": "stop-run-tests",
+    "name": "Lancement des tests en fin de réponse",
+    "category": "validation",
+    "provider": ["claude-code"],
+    "hook_type": "Stop",
+    "trigger": "*",
+    "description": "Quand l'agent termine sa réponse, exécute la suite de tests. Si des tests échouent, renvoie l'agent au travail pour les corriger avant de rendre la main.",
+    "use_cases": ["TDD assisté", "Garantie de non-régression", "Qualité avant remise"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/run-tests.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$CLAUDE_PROJECT_DIR\"\nif out=$(npm test --silent 2>&1); then\n  exit 0\nelse\n  echo '{\"decision\":\"block\",\"reason\":\"Des tests échouent. Corrige-les avant de terminer.\"}'\n  exit 0\nfi\n"
+    },
+    "community_examples": [],
+    "tags": ["validation", "tests", "ci", "quality"],
+    "votes": 0
+  },
+  {
+    "id": "notification-slack",
+    "slug": "notification-slack",
+    "name": "Notification Slack sur événement agent",
+    "category": "notification",
+    "provider": ["claude-code"],
+    "hook_type": "Notification",
+    "trigger": "*",
+    "description": "Relaie les notifications de l'agent (demande de permission, attente d'input) vers un canal Slack via webhook, utile pour les sessions longues ou non surveillées.",
+    "use_cases": ["Sessions longues", "Supervision distante", "Collaboration d'équipe"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "Notification": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/notify-slack.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/notify-slack.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\nmsg=$(echo \"$input\" | jq -r '.message // \"Claude Code a besoin de votre attention\"')\ncurl -s -X POST -H 'Content-type: application/json' \\\n  --data \"{\\\"text\\\":\\\"🤖 $msg\\\"}\" \\\n  \"$SLACK_WEBHOOK_URL\" >/dev/null 2>&1 || true\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["notification", "slack", "webhook", "monitoring"],
+    "votes": 0
+  },
+  {
+    "id": "session-end-audit-log",
+    "slug": "session-end-audit-log",
+    "name": "Journal d'audit de fin de session",
+    "category": "notification",
+    "provider": ["claude-code"],
+    "hook_type": "SessionEnd",
+    "trigger": "*",
+    "description": "En fin de session, écrit une ligne d'audit (horodatage, raison de fin, répertoire) dans un fichier de log local pour la traçabilité DevSecOps.",
+    "use_cases": ["Traçabilité", "Audit DevSecOps", "Reporting d'usage"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SessionEnd": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/audit-log.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/audit-log.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\nreason=$(echo \"$input\" | jq -r '.reason // \"unknown\"')\nlog=\"$CLAUDE_PROJECT_DIR/.claude/session-audit.log\"\necho \"$(date -u +%Y-%m-%dT%H:%M:%SZ) session_end reason=$reason cwd=$CLAUDE_PROJECT_DIR\" >> \"$log\"\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["notification", "audit", "logging", "devsecops"],
+    "votes": 0
+  },
+  {
+    "id": "pre-webfetch-domain-allowlist",
+    "slug": "pre-webfetch-domain-allowlist",
+    "name": "Allowlist de domaines pour WebFetch",
+    "category": "workflow",
+    "provider": ["claude-code"],
+    "hook_type": "PreToolUse",
+    "trigger": "WebFetch",
+    "description": "Contrôle les accès réseau de l'agent en n'autorisant WebFetch que vers une liste de domaines approuvés. Toute autre URL est bloquée.",
+    "use_cases": ["Contrôle réseau", "Conformité data", "Environnements restreints"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PreToolUse": [
+            {
+              "matcher": "WebFetch",
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/webfetch-allowlist.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/webfetch-allowlist.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\nurl=$(echo \"$input\" | jq -r '.tool_input.url // \"\"')\nallowed='(docs\\.anthropic\\.com|github\\.com|developer\\.mozilla\\.org)'\nif echo \"$url\" | grep -qiE \"^https?://([a-z0-9.-]*\\.)?$allowed\"; then\n  exit 0\nfi\necho '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Domaine non autorisé par l allowlist réseau.\"}}'\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["workflow", "network", "webfetch", "allowlist"],
+    "votes": 0
+  },
+  {
+    "id": "post-bash-cost-tracker",
+    "slug": "post-bash-cost-tracker",
+    "name": "Suivi d'usage des outils",
+    "category": "notification",
+    "provider": ["claude-code"],
+    "hook_type": "PostToolUse",
+    "trigger": "*",
+    "description": "Incrémente un compteur par type d'outil après chaque utilisation et journalise l'activité, offrant une vue de l'intensité d'usage de l'agent par session.",
+    "use_cases": ["Observabilité", "Analyse d'usage", "FinOps agentique"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/tool-usage.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/tool-usage.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\ntool=$(echo \"$input\" | jq -r '.tool_name // \"unknown\"')\nlog=\"$CLAUDE_PROJECT_DIR/.claude/tool-usage.log\"\necho \"$(date -u +%Y-%m-%dT%H:%M:%SZ) $tool\" >> \"$log\"\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["notification", "observability", "metrics", "finops"],
+    "votes": 0
+  },
+  {
+    "id": "stop-generate-changelog",
+    "slug": "stop-generate-changelog",
+    "name": "Génération de résumé de session",
+    "category": "documentation",
+    "provider": ["claude-code"],
+    "hook_type": "Stop",
+    "trigger": "*",
+    "description": "En fin de session, capture le diff des fichiers modifiés et l'ajoute à un journal de changements horodaté, créant un changelog automatique de ce que l'agent a produit.",
+    "use_cases": ["Changelog automatique", "Traçabilité des changements", "Revue a posteriori"],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-changelog.sh" }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/session-changelog.sh",
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$CLAUDE_PROJECT_DIR\"\nlog=\".claude/session-changelog.md\"\nchanged=$(git status --short 2>/dev/null)\nif [ -n \"$changed\" ]; then\n  {\n    echo \"## Session $(date -u +%Y-%m-%dT%H:%M:%SZ)\"\n    echo '```'\n    echo \"$changed\"\n    echo '```'\n    echo\n  } >> \"$log\"\nfi\nexit 0\n"
+    },
+    "community_examples": [],
+    "tags": ["documentation", "changelog", "git", "summary"],
+    "votes": 0
+  }
+]
