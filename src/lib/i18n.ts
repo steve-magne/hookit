@@ -55,9 +55,9 @@ export interface Translations {
 }
 
 const fr: Translations = {
-  metaTitle: 'Hookit — Catalogue de hooks agentiques',
-  metaDescription: 'Catalogue communautaire de hooks pour Claude Code & GitHub Copilot',
-  footerText: 'Hookit — POC v0.1 · Catalogue communautaire de hooks agentiques',
+  metaTitle: 'Catalogue de hooks agentiques pour Claude Code',
+  metaDescription: "Parcourez 42+ hooks agentiques prêts à l'emploi pour Claude Code et GitHub Copilot. Sécurité, workflow, contexte — installez en 2 minutes.",
+  footerText: 'Claude Hooks — Catalogue communautaire de hooks agentiques',
   navCatalogue: 'Catalogue',
   navContribute: 'Contribuer',
   hooksSelectedOne: 'hook sélectionné',
@@ -124,9 +124,9 @@ const fr: Translations = {
 }
 
 const en: Translations = {
-  metaTitle: 'Hookit — Agentic hooks catalogue',
-  metaDescription: 'Community catalogue of hooks for Claude Code & GitHub Copilot',
-  footerText: 'Hookit — POC v0.1 · Community catalogue of agentic hooks',
+  metaTitle: 'Agentic hooks catalogue for Claude Code',
+  metaDescription: 'Browse 42+ production-ready agentic hooks for Claude Code & GitHub Copilot. Security, workflow automation, context injection — install in 2 minutes.',
+  footerText: 'Claude Hooks — Community catalogue of agentic hooks',
   navCatalogue: 'Catalogue',
   navContribute: 'Contribute',
   hooksSelectedOne: 'hook selected',

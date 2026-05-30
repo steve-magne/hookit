@@ -14,9 +14,30 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params
   const T = getT(locale as Locale)
+  const url = `https://claudehooks.vercel.app/${locale}`
   return {
     title: T.metaTitle,
     description: T.metaDescription,
+    openGraph: {
+      title: T.metaTitle,
+      description: T.metaDescription,
+      url,
+      siteName: 'Claude Hooks',
+      locale: locale === 'fr' ? 'fr_FR' : 'en_US',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: T.metaTitle,
+      description: T.metaDescription,
+    },
+    alternates: {
+      canonical: url,
+      languages: {
+        en: 'https://claudehooks.vercel.app/en',
+        fr: 'https://claudehooks.vercel.app/fr',
+      },
+    },
   }
 }
 

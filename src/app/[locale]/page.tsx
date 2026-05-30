@@ -1,5 +1,8 @@
 import { getT, type Locale } from '@/lib/i18n'
 import { CatalogueExplorer } from '@/components/CatalogueExplorer'
+import { allHooks, localizeHook } from '@/lib/hooks'
+
+const BASE = 'https://claudehooks.vercel.app'
 
 export default async function HomePage({
   params,
@@ -9,8 +12,42 @@ export default async function HomePage({
   const { locale } = await params
   const T = getT(locale as Locale)
 
+  const websiteJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Claude Hooks',
+    url: BASE,
+    description: T.metaDescription,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${BASE}/${locale}?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  }
+
+  const itemListJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: T.catalogueTitle,
+    url: `${BASE}/${locale}`,
+    numberOfItems: allHooks.length,
+    itemListElement: allHooks.map((hook, i) => {
+      const h = localizeHook(hook, locale as Locale)
+      return {
+        '@type': 'ListItem',
+        position: i + 1,
+        name: h.name,
+        description: h.description,
+        url: `${BASE}/${locale}/hook/${hook.slug}`,
+      }
+    }),
+  }
+
   return (
-    <div className="mx-auto max-w-6xl px-4">
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
+      <div className="mx-auto max-w-6xl px-4">
       <section className="pt-16 pb-10 text-center">
         <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-bold leading-tight text-white sm:text-5xl">
           {T.heroTitle1}{' '}
@@ -28,5 +65,6 @@ export default async function HomePage({
         <CatalogueExplorer />
       </section>
     </div>
+    </>
   )
 }

@@ -1,22 +1,63 @@
-'use client'
-
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { ArrowLeft, Check, Plus } from 'lucide-react'
-import { getHookBySlug, localizeHook } from '@/lib/hooks'
-import { useSelection } from '@/store/selection'
-import { useT, useLocale } from '@/lib/locale-context'
+import { ArrowLeft } from 'lucide-react'
+import { allHooks, getHookBySlug, localizeHook } from '@/lib/hooks'
+import { getT, type Locale } from '@/lib/i18n'
 import { CategoryBadge, HookTypeBadge } from '@/components/Badge'
 import { PROVIDER_LABELS } from '@/types/hook'
+import { HookSelectButton } from '@/components/HookSelectButton'
+import type { Metadata } from 'next'
 
-export default function HookDetailPage() {
-  const { slug } = useParams<{ slug: string; locale: string }>()
-  const locale = useLocale()
-  const T = useT()
-  const base = slug ? getHookBySlug(slug) : undefined
-  const hook = base ? localizeHook(base, locale) : undefined
-  const selected = useSelection((s) => (slug ? s.selected.includes(slug) : false))
-  const toggle = useSelection((s) => s.toggle)
+const BASE = 'https://claudehooks.vercel.app'
+
+export async function generateStaticParams() {
+  return allHooks.map((hook) => ({ slug: hook.slug }))
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>
+}): Promise<Metadata> {
+  const { locale, slug } = await params
+  const base = getHookBySlug(slug)
+  if (!base) return {}
+  const hook = localizeHook(base, locale as Locale)
+
+  return {
+    title: hook.name,
+    description: hook.description,
+    keywords: hook.tags.join(', '),
+    openGraph: {
+      title: hook.name,
+      description: hook.description,
+      url: `${BASE}/${locale}/hook/${slug}`,
+      siteName: 'Claude Hooks',
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary',
+      title: hook.name,
+      description: hook.description,
+    },
+    alternates: {
+      canonical: `${BASE}/${locale}/hook/${slug}`,
+      languages: {
+        en: `${BASE}/en/hook/${slug}`,
+        fr: `${BASE}/fr/hook/${slug}`,
+      },
+    },
+  }
+}
+
+export default async function HookDetailPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>
+}) {
+  const { locale, slug } = await params
+  const T = getT(locale as Locale)
+  const base = getHookBySlug(slug)
+  const hook = base ? localizeHook(base, locale as Locale) : undefined
 
   if (!hook) {
     return (
@@ -31,92 +72,103 @@ export default function HookDetailPage() {
 
   const settingsFragment = JSON.stringify(hook.implementation.config, null, 2)
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareSourceCode',
+    name: hook.name,
+    description: hook.description,
+    keywords: hook.tags.join(', '),
+    programmingLanguage: 'JavaScript',
+    url: `${BASE}/${locale}/hook/${hook.slug}`,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Claude Hooks',
+      url: BASE,
+    },
+  }
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <Link
-        href={`/${locale}`}
-        className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
-      >
-        <ArrowLeft className="size-4" /> {T.backToCatalogue}
-      </Link>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <Link
+          href={`/${locale}`}
+          className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
+        >
+          <ArrowLeft className="size-4" /> {T.backToCatalogue}
+        </Link>
 
-      <div className="mb-4 flex items-center gap-2">
-        <CategoryBadge category={hook.category} />
-        <HookTypeBadge type={hook.hook_type} trigger={hook.trigger} />
-      </div>
-
-      <h1 className="mb-3 text-3xl font-bold text-white">{hook.name}</h1>
-      <p className="mb-6 text-lg text-zinc-300">{hook.description}</p>
-
-      <button
-        onClick={() => toggle(hook.slug)}
-        className={`mb-8 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium ${
-          selected
-            ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-            : 'bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-2)]'
-        }`}
-      >
-        {selected ? <Check className="size-4" /> : <Plus className="size-4" />}
-        {selected ? T.addedToSelection : T.addToMyConfig}
-      </button>
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            {T.useCases}
-          </h2>
-          <ul className="space-y-1.5 text-sm text-zinc-300">
-            {hook.use_cases.map((u) => (
-              <li key={u} className="flex items-start gap-2">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-brand)]" />
-                {u}
-              </li>
-            ))}
-          </ul>
+        <div className="mb-4 flex items-center gap-2">
+          <CategoryBadge category={hook.category} />
+          <HookTypeBadge type={hook.hook_type} trigger={hook.trigger} />
         </div>
-        <div>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            {T.providersAndTags}
-          </h2>
-          <div className="mb-3 flex flex-wrap gap-2">
-            {hook.provider.map((p) => (
-              <span
-                key={p}
-                className="rounded-md bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-zinc-300 ring-1 ring-inset ring-[var(--color-border)]"
-              >
-                {PROVIDER_LABELS[p]}
-              </span>
-            ))}
+
+        <h1 className="mb-3 text-3xl font-bold text-white">{hook.name}</h1>
+        <p className="mb-6 text-lg text-zinc-300">{hook.description}</p>
+
+        <HookSelectButton slug={hook.slug} />
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              {T.useCases}
+            </h2>
+            <ul className="space-y-1.5 text-sm text-zinc-300">
+              {hook.use_cases.map((u) => (
+                <li key={u} className="flex items-start gap-2">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-brand)]" />
+                  {u}
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {hook.tags.map((t) => (
-              <span key={t} className="text-xs text-zinc-500">
-                #{t}
-              </span>
-            ))}
+          <div>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              {T.providersAndTags}
+            </h2>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {hook.provider.map((p) => (
+                <span
+                  key={p}
+                  className="rounded-md bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-zinc-300 ring-1 ring-inset ring-[var(--color-border)]"
+                >
+                  {PROVIDER_LABELS[p]}
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {hook.tags.map((t) => (
+                <span key={t} className="text-xs text-zinc-500">
+                  #{t}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="mt-8">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          {T.settingsFragment}
-        </h2>
-        <pre className="overflow-auto rounded-xl border border-[var(--color-border)] bg-[#0d0d14] p-4 text-xs text-zinc-200">
-          <code>{settingsFragment}</code>
-        </pre>
-      </div>
-
-      {hook.implementation.code_snippet && (
-        <div className="mt-6">
+        <div className="mt-8">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Script · {hook.implementation.script_path}
+            {T.settingsFragment}
           </h2>
           <pre className="overflow-auto rounded-xl border border-[var(--color-border)] bg-[#0d0d14] p-4 text-xs text-zinc-200">
-            <code>{hook.implementation.code_snippet}</code>
+            <code>{settingsFragment}</code>
           </pre>
         </div>
-      )}
-    </div>
+
+        {hook.implementation.code_snippet && (
+          <div className="mt-6">
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              Script · {hook.implementation.script_path}
+            </h2>
+            <pre className="overflow-auto rounded-xl border border-[var(--color-border)] bg-[#0d0d14] p-4 text-xs text-zinc-200">
+              <code>{hook.implementation.code_snippet}</code>
+            </pre>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
