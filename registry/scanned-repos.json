@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://github.com/anthropics/claude-code",
+    "name": "anthropics/claude-code",
+    "scanned_at": "2026-05-29T23:16:40.803Z",
+    "hooks_found": 0,
+    "hooks_added": 0,
+    "status": "success"
+  },
+  {
+    "url": "https://github.com/eastlondoner/cursor-tools",
+    "name": "eastlondoner/cursor-tools",
+    "scanned_at": "2026-05-29T23:16:53.780Z",
+    "hooks_found": 1,
+    "hooks_added": 0,
+    "status": "success"
+  },
+  {
+    "url": "https://github.com/facebook/react",
+    "name": "facebook/react",
+    "scanned_at": "2026-05-29T23:10:04.029Z",
+    "hooks_found": 1,
+    "hooks_added": 1,
+    "status": "success"
+  }
+]

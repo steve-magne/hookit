@@ -1,12 +1,9 @@
 # Hookit 🪝
 
-> Catalogue communautaire de **hooks agentiques** pour Claude Code (et bientôt GitHub Copilot).
+> Catalogue communautaire de **hooks agentiques** pour Claude Code et GitHub Copilot.
 > POC v0.1 — découverte, sélection, génération de configuration et registre vivant.
 
-Hookit permet aux développeurs de **découvrir** des hooks pertinents, de les
-**sélectionner**, et de **générer un `settings.json`** prêt à coller. Le
-registre s'enrichit en analysant des dépôts GitHub soumis par la communauté via
-un agent Claude Code.
+Hookit permet aux développeurs de **découvrir** des hooks pertinents, de les **sélectionner**, et de **générer un `settings.json`** prêt à coller. Le registre s'enrichit en analysant des dépôts GitHub soumis par la communauté via un agent Claude Code ou GitHub Copilot
 
 ## Stack
 

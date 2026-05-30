@@ -57,6 +57,15 @@ export interface Hook {
   votes: number
 }
 
+export interface ScannedRepo {
+  url: string
+  name: string
+  scanned_at: string
+  hooks_found: number
+  hooks_added: number
+  status: 'success' | 'error' | 'no-hooks'
+}
+
 // Liste ordonnée des events pour les filtres (présents dans le seed en priorité)
 export const HOOK_TYPES: HookType[] = [
   'PreToolUse',

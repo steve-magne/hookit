@@ -51,13 +51,13 @@ jobs:
             --add-dir /tmp/submitted-repo \
             > /tmp/new-hooks.json || true
           # Garde uniquement le bloc JSON renvoyé
-          node scripts/extract-json.js /tmp/new-hooks.json > /tmp/new-hooks.clean.json
+          node .claude/skills/analyze-repo/scripts/extract-json.js /tmp/new-hooks.json > /tmp/new-hooks.clean.json
           mv /tmp/new-hooks.clean.json /tmp/new-hooks.json
 
       - name: Merge new hooks into registry
         id: merge
         run: |
-          node scripts/merge-hooks.js /tmp/new-hooks.json registry/registry.json "${{ steps.extract.outputs.repo_url }}"
+          node .claude/skills/analyze-repo/scripts/merge-hooks.js /tmp/new-hooks.json registry/registry.json "${{ steps.extract.outputs.repo_url }}"
           echo "added=$(cat /tmp/added-count.txt 2>/dev/null || echo 0)" >> "$GITHUB_OUTPUT"
 
       - name: Create PR if new hooks found
