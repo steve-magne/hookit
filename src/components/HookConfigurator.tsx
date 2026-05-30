@@ -1,10 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, Copy, Download, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, Terminal, Trash2 } from 'lucide-react'
 import { useSelection } from '@/store/selection'
 import { allHooks } from '@/lib/hooks'
-import { collectScripts, toSettingsJson } from '@/lib/mergeConfig'
+import { collectScripts, generateInstallScript, toSettingsJson } from '@/lib/mergeConfig'
 import { useT } from '@/lib/locale-context'
 
 export function HookConfigurator() {
@@ -13,6 +13,7 @@ export function HookConfigurator() {
   const remove = useSelection((s) => s.remove)
   const clear = useSelection((s) => s.clear)
   const [copied, setCopied] = useState(false)
+  const [scriptCopied, setScriptCopied] = useState(false)
 
   const hooks = useMemo(() => allHooks.filter((h) => selected.includes(h.slug)), [selected])
   const json = useMemo(() => toSettingsJson(hooks), [hooks])
@@ -22,6 +23,12 @@ export function HookConfigurator() {
     await navigator.clipboard.writeText(json)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  const copyInstallScript = async () => {
+    await navigator.clipboard.writeText(generateInstallScript(hooks))
+    setScriptCopied(true)
+    setTimeout(() => setScriptCopied(false), 1500)
   }
 
   const download = () => {
@@ -67,6 +74,14 @@ export function HookConfigurator() {
           >
             {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
             {copied ? T.copied : T.copy}
+          </button>
+          <button
+            onClick={copyInstallScript}
+            className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-[var(--color-surface-2)]"
+            title="node install-hooks.mjs"
+          >
+            {scriptCopied ? <Check className="size-4 text-emerald-400" /> : <Terminal className="size-4" />}
+            {scriptCopied ? T.installScriptCopied : T.installScript}
           </button>
           <button
             onClick={download}

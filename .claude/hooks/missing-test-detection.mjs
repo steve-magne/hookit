@@ -41,6 +41,7 @@ export function run({
 
   if (!missing.length) {
     try { unlink(counterFile); } catch {}
+    process.stderr.write('[missing-test-detection] ✓ Aucun fichier source sans test détecté.\n');
     return { exitCode: 0 };
   }
 
@@ -60,6 +61,6 @@ export function run({
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const result = run();
-  if (result.message) process.stdout.write(result.message);
+  if (result.message) process.stderr.write(result.message);
   process.exit(result.exitCode);
 }

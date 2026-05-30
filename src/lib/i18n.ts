@@ -29,6 +29,8 @@ export interface Translations {
   copy: string
   scriptsToCreate: string
   makeExecutable: string
+  installScript: string
+  installScriptCopied: string
   hookNotFound: string
   backToCatalogue: string
   useCases: string
@@ -77,6 +79,8 @@ const fr: Translations = {
   copy: 'Copier',
   scriptsToCreate: 'Scripts à créer',
   makeExecutable: 'Pense à rendre les scripts exécutables :',
+  installScript: "Script d'installation",
+  installScriptCopied: 'Script copié',
   hookNotFound: 'Hook introuvable.',
   backToCatalogue: 'Retour au catalogue',
   useCases: "Cas d'usage",
@@ -140,6 +144,8 @@ const en: Translations = {
   copy: 'Copy',
   scriptsToCreate: 'Scripts to create',
   makeExecutable: 'Remember to make scripts executable:',
+  installScript: 'Install script',
+  installScriptCopied: 'Script copied',
   hookNotFound: 'Hook not found.',
   backToCatalogue: 'Back to catalogue',
   useCases: 'Use cases',
