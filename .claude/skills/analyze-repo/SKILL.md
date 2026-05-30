@@ -1,11 +1,28 @@
 ---
 name: analyze-repo
-description: Analyse un dépôt GitHub pour en extraire les hooks agentiques et alimenter le catalogue Hookit. Déclencher quand l'utilisateur fournit une URL GitHub à analyser, mentionne "ajouter un repo", "scanner un dépôt", "enrichir le registre" ou veut ajouter des hooks au catalogue. Utiliser même si l'utilisateur se contente de coller une URL GitHub sans explication supplémentaire.
+description: Analyse une source externe pour en extraire des hooks agentiques et alimenter le catalogue Hookit. Déclencher quand l'utilisateur fournit une URL GitHub à analyser, une URL d'article de blog, une URL de documentation (ex. docs Claude Code, guides hooks), mentionne "ajouter un repo", "scanner un dépôt", "enrichir le registre", "analyser cette doc", ou veut ajouter des hooks au catalogue. Utiliser même si l'utilisateur se contente de coller une URL sans explication supplémentaire.
 ---
 
-Pipeline d'analyse pour `$ARGUMENTS` (URL GitHub). Exécuter depuis la racine du projet hookit.
+Pipeline d'analyse pour `$ARGUMENTS`. Exécuter depuis la racine du projet hookit.
 
-## Phase 1+2 — Découverte et récupération (script, 0 token LLM)
+## Phase 0 — Détection du type de source
+
+```bash
+if echo "$ARGUMENTS" | grep -qE 'github\.com/[^/]+/[^/]+'; then
+  SOURCE_TYPE="github"
+else
+  SOURCE_TYPE="documentation"
+fi
+echo "Source détectée : $SOURCE_TYPE"
+```
+
+Brancher sur la phase correspondante selon `SOURCE_TYPE`.
+
+---
+
+## Phase 1+2 — [GitHub] Découverte et récupération (script, 0 token LLM)
+
+> Exécuter uniquement si `SOURCE_TYPE="github"`.
 
 ```bash
 DATA=$(bash .claude/skills/analyze-repo/scripts/fetch-hook-sources.sh "$ARGUMENTS" registry/registry.json)
@@ -15,29 +32,75 @@ echo "$DATA"
 - Si `DATA` contient la clé `"error"` → afficher l'erreur et s'arrêter.
 - Si `has_hooks` est `false` → écrire `[]` dans `/tmp/hookit-hooks-new.json` et passer directement à la Phase 3.5.
 
+---
+
+## Phase 1b — [Documentation] Récupération de la page (script, 0 token LLM)
+
+> Exécuter uniquement si `SOURCE_TYPE="documentation"`.
+
+```bash
+DATA=$(node .claude/skills/analyze-repo/scripts/fetch-doc-sources.mjs "$ARGUMENTS" registry/registry.json)
+echo "$DATA"
+```
+
+- Si `DATA` contient la clé `"error"` → afficher l'erreur et s'arrêter.
+- `DATA` contient : `{ source_type, url, title, content, existing_slugs }`.
+- `content` est le texte extrait de la page (HTML strippé, sections hook-pertinentes prioritaires).
+
+---
+
 ## Phase 3 — Extraction des hooks (seule phase LLM)
 
-À partir du `DATA` ci-dessus, produire une entrée JSON pour chaque **concept fonctionnel réutilisable** trouvé dans les scripts des hooks déclarés dans `hooks` et `hooks_local`. Les contenus de `hook_scripts` alimentent `code_snippet`.
+À partir du `DATA` ci-dessus, produire des entrées JSON selon le mode actif.
+
+---
+
+### Mode GitHub
+
+Produire une entrée JSON pour chaque **concept fonctionnel réutilisable** trouvé dans les scripts des hooks déclarés dans `hooks` et `hooks_local`. Les contenus de `hook_scripts` alimentent `code_snippet`.
 
 **Règle fondamentale** : ne créer une entrée que pour un comportement ancré dans un hook explicitement déclaré sous `hooks` (ou `hooks_local`). Ne jamais inventer un hook depuis un README, CLAUDE.md ou documentation.
 
-**Granularité sub-script** : si un script implémente plusieurs concepts distincts et indépendants, créer **une entrée par concept**, pas une seule entrée par événement. Exemples de concepts distincts dans un même script :
-- vérification lint ≠ vérification coverage globale ≠ coverage par fichier modifié
-- détection de tests manquants ≠ exécution des tests
-- Un concept est distinct s'il peut être extrait et réutilisé seul dans un autre projet sans nécessiter le reste du script.
+**Granularité sub-script** : si un script implémente plusieurs concepts distincts et indépendants, créer **une entrée par concept**, pas une seule entrée par événement. Un concept est distinct s'il peut être extrait et réutilisé seul dans un autre projet.
 
-**Analyse des scripts** : lire chaque contenu de `hook_scripts` en entier. Identifier toutes les phases/blocs logiques du script. Pour chaque bloc indépendant, évaluer s'il constitue un pattern réutilisable méritant sa propre entrée dans le catalogue.
+**Analyse des scripts** : lire chaque contenu de `hook_scripts` en entier. Identifier toutes les phases/blocs logiques. Pour chaque bloc indépendant, évaluer s'il constitue un pattern réutilisable.
 
 **Déduplication** : si un slug figure dans `existing_slugs` → réutiliser ce slug ; le merge ajoutera l'exemple communautaire sans créer de doublon.
 
-**Adaptation obligatoire au projet cible** : les scripts sources peuvent être en bash (`.sh`), Python, etc. Peu importe le langage source, produire **toujours** :
+---
+
+### Mode Documentation
+
+Produire une entrée JSON pour chaque **principe d'automatisation concret** identifiable dans `content`.
+
+**Règle fondamentale** : ne créer une entrée que si le texte décrit explicitement un comportement automatisable via un hook Claude Code (événement + déclencheur identifiables). Ne pas inventer de hooks depuis des généralités.
+
+**Critères d'extraction** :
+- Le texte mentionne un cas d'usage précis ("bloquer X", "notifier quand Y", "vérifier avant Z") → candidat valide
+- Le cas d'usage est réalisable par un des événements Claude Code (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Notification`, `Stop`, etc.)
+- Granularité : un principe par entrée (ex. "bloquer les secrets" ≠ "bloquer les destructives" ≠ "formater après écriture")
+
+**Synthèse** : contrairement au mode GitHub (extraction depuis du code existant), ici le hook est **synthétisé depuis une description**. L'implémentation doit être fonctionnelle et réaliste, pas un squelette vide.
+
+**Déduplication** : si un slug figure dans `existing_slugs` → ignorer (le principe est déjà couvert).
+
+**`community_examples`** : utiliser `article_url` à la place de `file_path` pour tracer l'origine documentaire :
+```json
+{ "repo": "$ARGUMENTS", "article_url": "$ARGUMENTS", "source_type": "documentation", "added_by": "documentation-analysis" }
+```
+
+---
+
+### Règles communes aux deux modes
+
+**Adaptation obligatoire** : produire **toujours** :
 - `script_path` avec extension `.mjs`
 - `code_snippet` en Node.js pur (builtins uniquement : `fs`, `child_process`, `path`, `os`) — jamais du bash copié verbatim
 - La commande dans `implementation.config` doit référencer le script `.mjs` (ex. `node $CLAUDE_PROJECT_DIR/.claude/hooks/nom.mjs`)
 
-Le concept est **extrait et réimplémenté**, pas copié. Traduire la logique (ex. vérification de pattern dans un fichier) en Node.js idiomatique, avec `readFileSync(0, 'utf8')` pour lire le contexte stdin, `process.exit(0)` implicite, et `{ decision: 'block', reason: '...' }` sur stdout pour bloquer.
+Le concept est **réimplémenté en Node.js idiomatique** : `readFileSync(0, 'utf8')` pour lire stdin, `process.exit(0)` implicite si pas de blocage, `{ decision: 'block', reason: '...' }` sur stdout pour bloquer.
 
-Schema d'une entrée (toutes les clés sont requises) :
+**Schema d'une entrée** (toutes les clés requises) :
 
 ```json
 {
@@ -70,6 +133,8 @@ Schema d'une entrée (toutes les clés sont requises) :
 
 Écrire le tableau JSON résultant dans `/tmp/hookit-hooks-new.json`.
 
+---
+
 ## Phase 3.5 — Validation qualité (script, 0 token LLM)
 
 ```bash
@@ -99,23 +164,22 @@ APPLIED=$(cat /tmp/applied-count.txt 2>/dev/null || echo 0)
 APPLIED_FROM_SCAN=$(cat /tmp/applied-from-scan-count.txt 2>/dev/null || echo 0)
 ```
 
-Applique en priorité les slugs de référence (`RECOMMENDED_SLUGS`), puis les hooks du repo
-scanné marqués comme recommandés (catégorie `security`/`validation`, sans effet réseau en pre-hook).
+Applique en priorité les slugs de référence (`RECOMMENDED_SLUGS`), puis les hooks de la source
+scannée marqués comme recommandés (catégorie `security`/`validation`, sans effet réseau en pre-hook).
 
 ## Résumé
 
 Afficher uniquement ce bloc, sans autre texte :
 
 ```
-Repo analysé     : <repo>
+Source analysée  : <url> [github|documentation]
 Hooks extraits   : <HOOKS_FOUND>
 Hooks valides    : <HOOKS_VALID> (<HOOKS_FOUND - HOOKS_VALID> rejeté(s))
 Hooks ajoutés    : <HOOKS_ADDED> (ou "0 — exemples communautaires enrichis")
-Appliqués projet : <APPLIED> dont <APPLIED_FROM_SCAN> du repo scanné (ou "déjà à jour")
+Appliqués projet : <APPLIED> dont <APPLIED_FROM_SCAN> de la source scannée (ou "déjà à jour")
 
 Fichiers modifiés :
   registry/registry.json
-  src/data/hooks-seed.json
   registry/scanned-repos.json
   .claude/settings.json
 ```

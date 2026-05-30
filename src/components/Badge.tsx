@@ -1,11 +1,15 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS, type Category } from '@/types/hook'
+'use client'
+
+import { CATEGORY_COLORS, type Category } from '@/types/hook'
+import { useT } from '@/lib/locale-context'
 
 export function CategoryBadge({ category }: { category: Category }) {
+  const T = useT()
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${CATEGORY_COLORS[category]}`}
     >
-      {CATEGORY_LABELS[category]}
+      {T.categoryLabels[category] ?? category}
     </span>
   )
 }

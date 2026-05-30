@@ -14,6 +14,9 @@ const VALID_HOOK_TYPES = [
   'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification',
   'Stop', 'SubagentStop', 'SubagentStart', 'PreCompact', 'SessionStart', 'SessionEnd',
   'WorktreeCreate', 'PermissionRequest', 'PostToolUseFailure',
+  'ConfigChange', 'CwdChanged', 'FileChanged', 'TeammateIdle',
+  'TaskCreated', 'TaskCompleted', 'StopFailure', 'MessageDisplay',
+  'PostToolBatch', 'UserPromptExpansion', 'Setup', 'PermissionDenied',
 ]
 
 // Commandes pouvant bloquer l'agent si utilisées en pre-hook sur trigger large

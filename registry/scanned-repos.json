@@ -38,5 +38,13 @@
     "hooks_found": 16,
     "hooks_added": 11,
     "status": "success"
+  },
+  {
+    "url": "https://code.claude.com/docs/fr/hooks-guide#ce-que-vous-pouvez-automatiser",
+    "name": "code.claude.com/docs/fr/hooks-guide",
+    "scanned_at": "2026-05-30T11:35:21.148Z",
+    "hooks_found": 5,
+    "hooks_added": 5,
+    "status": "success"
   }
 ]

@@ -1815,5 +1815,271 @@
       "maintenance"
     ],
     "votes": 0
+  },
+  {
+    "id": "session-start-reinject-after-compact",
+    "slug": "session-start-reinject-after-compact",
+    "name": "Réinjecter le contexte après compaction",
+    "category": "context",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "SessionStart",
+    "trigger": "compact",
+    "description": "Réinjecte les conventions et le contexte critique du projet dans la session après que Claude Code ait compacté la fenêtre de contexte, évitant ainsi la perte d'informations importantes.",
+    "use_cases": [
+      "Rappeler les conventions du projet (gestionnaire de paquets, style de code) après compaction",
+      "Réinjecter le sprint en cours ou les tâches critiques",
+      "Rappeler les commandes de test ou de build importantes"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "matcher": "compact",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/reinject-after-compact.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/reinject-after-compact.mjs",
+      "code_snippet": "import { readFileSync } from 'fs';\nimport { join } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\n\nif (input.source !== 'compact') process.exit(0);\n\nconst projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();\nlet context = '';\n\ntry {\n  const claudeMd = readFileSync(join(projectDir, 'CLAUDE.md'), 'utf8');\n  // Extract key conventions section only\n  const match = claudeMd.match(/##[\\s\\S]{0,500}/);\n  context = match ? match[0] : claudeMd.substring(0, 500);\n} catch {\n  context = 'Context compacted — please review CLAUDE.md for project conventions.';\n}\n\nprocess.stdout.write(`[Post-compaction reminder]\\n${context}\\n`);\nprocess.exit(0);"
+    },
+    "community_examples": [
+      {
+        "repo": "https://code.claude.com/docs/fr/hooks-guide#ce-que-vous-pouvez-automatiser",
+        "file_path": ".claude/hooks/reinject-after-compact.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "context",
+      "compaction",
+      "session",
+      "conventions"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "config-change-audit-log",
+    "slug": "config-change-audit-log",
+    "name": "Journal d'audit des changements de configuration",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "ConfigChange",
+    "trigger": "*",
+    "description": "Enregistre chaque modification de fichier de configuration Claude Code (settings.json, skills, etc.) dans un journal d'audit horodaté pour traçabilité et conformité.",
+    "use_cases": [
+      "Suivre qui a modifié la configuration Claude Code et quand",
+      "Audit de conformité sur les modifications de settings.json",
+      "Détecter des modifications non autorisées de la configuration"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "ConfigChange": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/config-audit-log.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/config-audit-log.mjs",
+      "code_snippet": "import { readFileSync, appendFileSync } from 'fs';\nimport { homedir } from 'os';\nimport { join } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\n\nconst entry = JSON.stringify({\n  timestamp: new Date().toISOString(),\n  source: input.source,\n  file: input.file_path,\n  session_id: input.session_id\n});\n\nconst logPath = join(homedir(), '.claude', 'config-audit.log');\nappendFileSync(logPath, entry + '\\n');\nprocess.exit(0);"
+    },
+    "community_examples": [
+      {
+        "repo": "https://code.claude.com/docs/fr/hooks-guide#ce-que-vous-pouvez-automatiser",
+        "file_path": ".claude/hooks/config-audit-log.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "audit",
+      "config",
+      "compliance",
+      "logging"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "cwd-changed-reload-direnv",
+    "slug": "cwd-changed-reload-direnv",
+    "name": "Recharger direnv au changement de répertoire",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "CwdChanged",
+    "trigger": "*",
+    "description": "Recharge automatiquement les variables d'environnement via direnv lorsque Claude change de répertoire de travail, garantissant que les commandes Bash utilisent le bon environnement selon le répertoire courant.",
+    "use_cases": [
+      "Projets mono-repo avec des environnements différents par sous-dossier",
+      "Gestion automatique de .envrc avec direnv",
+      "Synchroniser CLAUDE_ENV_FILE avec l'environnement du répertoire courant"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/reload-direnv.mjs"
+                }
+              ]
+            }
+          ],
+          "CwdChanged": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/reload-direnv.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/reload-direnv.mjs",
+      "code_snippet": "import { execSync } from 'child_process';\nimport { existsSync } from 'fs';\n\nconst envFile = process.env.CLAUDE_ENV_FILE;\nif (!envFile) process.exit(0);\n\ntry {\n  // Check direnv is available\n  execSync('which direnv', { stdio: 'ignore', timeout: 3000 });\n  execSync(`direnv export bash > \"${envFile}\"`, { timeout: 5000 });\n} catch {\n  // direnv not installed or .envrc not present — skip silently\n}\nprocess.exit(0);"
+    },
+    "community_examples": [
+      {
+        "repo": "https://code.claude.com/docs/fr/hooks-guide#ce-que-vous-pouvez-automatiser",
+        "file_path": ".claude/hooks/reload-direnv.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "direnv",
+      "environment",
+      "cwd",
+      "monorepo"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "permission-request-auto-allow-exit-plan",
+    "slug": "permission-request-auto-allow-exit-plan",
+    "name": "Approbation automatique de ExitPlanMode",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "PermissionRequest",
+    "trigger": "ExitPlanMode",
+    "description": "Approuve automatiquement la demande de permission ExitPlanMode, supprimant la boîte de dialogue interactive à chaque fois que Claude termine de présenter un plan et demande de procéder.",
+    "use_cases": [
+      "Workflows de planification où l'approbation manuelle est toujours accordée",
+      "Automatisation CI/CD avec mode plan activé",
+      "Réduire les interruptions lors de sessions interactives intensives"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PermissionRequest": [
+            {
+              "matcher": "ExitPlanMode",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/auto-allow-exit-plan.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/auto-allow-exit-plan.mjs",
+      "code_snippet": "import { readFileSync } from 'fs';\n\nreadFileSync(0, 'utf8'); // consume stdin\n\nprocess.stdout.write(JSON.stringify({\n  hookSpecificOutput: {\n    hookEventName: 'PermissionRequest',\n    decision: { behavior: 'allow' }\n  }\n}));\nprocess.exit(0);"
+    },
+    "community_examples": [
+      {
+        "repo": "https://code.claude.com/docs/fr/hooks-guide#ce-que-vous-pouvez-automatiser",
+        "file_path": ".claude/hooks/auto-allow-exit-plan.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "permission",
+      "plan-mode",
+      "automation",
+      "approval"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "post-bash-command-log",
+    "slug": "post-bash-command-log",
+    "name": "Journal des commandes Bash",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "PostToolUse",
+    "trigger": "Bash",
+    "description": "Enregistre chaque commande Bash exécutée par Claude dans un fichier journal horodaté pour audit, débogage et historique des actions de la session.",
+    "use_cases": [
+      "Auditer toutes les commandes shell exécutées par Claude",
+      "Déboguer les sessions Claude Code après coup",
+      "Historique des actions pour conformité ou documentation"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "matcher": "Bash",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/bash-command-log.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/bash-command-log.mjs",
+      "code_snippet": "import { readFileSync, appendFileSync } from 'fs';\nimport { homedir } from 'os';\nimport { join } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst command = input?.tool_input?.command || '';\nif (!command) process.exit(0);\n\nconst entry = `[${new Date().toISOString()}] ${command}\\n`;\nappendFileSync(join(homedir(), '.claude', 'bash-commands.log'), entry);\nprocess.exit(0);"
+    },
+    "community_examples": [
+      {
+        "repo": "https://code.claude.com/docs/fr/hooks-guide#ce-que-vous-pouvez-automatiser",
+        "file_path": ".claude/hooks/bash-command-log.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "logging",
+      "bash",
+      "audit",
+      "history"
+    ],
+    "votes": 0
   }
 ]

@@ -5,11 +5,14 @@ import { useParams } from 'next/navigation'
 import { ArrowLeft, Check, Plus } from 'lucide-react'
 import { getHookBySlug } from '@/lib/hooks'
 import { useSelection } from '@/store/selection'
+import { useT, useLocale } from '@/lib/locale-context'
 import { CategoryBadge, HookTypeBadge } from '@/components/Badge'
 import { PROVIDER_LABELS } from '@/types/hook'
 
 export default function HookDetailPage() {
-  const { slug } = useParams<{ slug: string }>()
+  const { slug } = useParams<{ slug: string; locale: string }>()
+  const locale = useLocale()
+  const T = useT()
   const hook = slug ? getHookBySlug(slug) : undefined
   const selected = useSelection((s) => (slug ? s.selected.includes(slug) : false))
   const toggle = useSelection((s) => s.toggle)
@@ -17,9 +20,9 @@ export default function HookDetailPage() {
   if (!hook) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center text-zinc-400">
-        <p>Hook introuvable.</p>
-        <Link href="/" className="mt-4 inline-block text-indigo-300 underline">
-          Retour au catalogue
+        <p>{T.hookNotFound}</p>
+        <Link href={`/${locale}`} className="mt-4 inline-block text-indigo-300 underline">
+          {T.backToCatalogue}
         </Link>
       </div>
     )
@@ -30,10 +33,10 @@ export default function HookDetailPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <Link
-        href="/"
+        href={`/${locale}`}
         className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
       >
-        <ArrowLeft className="size-4" /> Catalogue
+        <ArrowLeft className="size-4" /> {T.backToCatalogue}
       </Link>
 
       <div className="mb-4 flex items-center gap-2">
@@ -53,13 +56,13 @@ export default function HookDetailPage() {
         }`}
       >
         {selected ? <Check className="size-4" /> : <Plus className="size-4" />}
-        {selected ? 'Ajouté à la sélection' : 'Ajouter à ma config'}
+        {selected ? T.addedToSelection : T.addToMyConfig}
       </button>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Cas d'usage
+            {T.useCases}
           </h2>
           <ul className="space-y-1.5 text-sm text-zinc-300">
             {hook.use_cases.map((u) => (
@@ -72,7 +75,7 @@ export default function HookDetailPage() {
         </div>
         <div>
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Providers & tags
+            {T.providersAndTags}
           </h2>
           <div className="mb-3 flex flex-wrap gap-2">
             {hook.provider.map((p) => (
@@ -96,7 +99,7 @@ export default function HookDetailPage() {
 
       <div className="mt-8">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Fragment settings.json
+          {T.settingsFragment}
         </h2>
         <pre className="overflow-auto rounded-xl border border-[var(--color-border)] bg-[#0d0d14] p-4 text-xs text-zinc-200">
           <code>{settingsFragment}</code>

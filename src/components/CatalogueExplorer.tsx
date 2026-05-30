@@ -5,6 +5,7 @@ import { FilterBar } from './FilterBar'
 import { HookCard } from './HookCard'
 import { HookConfigurator } from './HookConfigurator'
 import { allHooks, emptyFilters, filterHooks } from '@/lib/hooks'
+import { useT } from '@/lib/locale-context'
 import type { Category } from '@/types/hook'
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function CatalogueExplorer({ initialCategory, showConfigurator = true }: Props) {
+  const T = useT()
   const [filters, setFilters] = useState({
     ...emptyFilters,
     categories: initialCategory ? [initialCategory] : [],
@@ -34,7 +36,7 @@ export function CatalogueExplorer({ initialCategory, showConfigurator = true }: 
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-[var(--color-border)] p-12 text-center text-zinc-500">
-          Aucun hook ne correspond à ces filtres.
+          {T.noResults}
         </div>
       )}
 

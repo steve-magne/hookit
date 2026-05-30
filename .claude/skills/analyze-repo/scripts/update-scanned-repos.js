@@ -11,8 +11,11 @@ if (!scannedFile || !url) {
 
 const repos = JSON.parse(readFileSync(scannedFile, 'utf8'))
 
-// Extrait "owner/repo" depuis l'URL GitHub
-const name = url.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
+// Extrait un nom lisible selon le type de source
+const isGitHub = url.includes('github.com')
+const name = isGitHub
+  ? url.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, '')
+  : (() => { try { const u = new URL(url); return u.hostname + u.pathname.replace(/\/$/, '') } catch { return url } })()
 
 const entry = {
   url: url.replace(/\.git$/, ''),

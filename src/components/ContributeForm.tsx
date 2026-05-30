@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { ExternalLink, GitPullRequest } from 'lucide-react'
 import { buildSubmissionIssueUrl, isValidGitHubRepoUrl } from '@/lib/github'
+import { useT } from '@/lib/locale-context'
 
 export function ContributeForm() {
+  const T = useT()
   const [repoUrl, setRepoUrl] = useState('')
   const [issueUrl, setIssueUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -13,7 +15,7 @@ export function ContributeForm() {
     e.preventDefault()
     setError(null)
     if (!isValidGitHubRepoUrl(repoUrl)) {
-      setError('Entre une URL de dépôt GitHub public valide (https://github.com/org/repo).')
+      setError(T.contributeError)
       return
     }
     const { issueUrl } = buildSubmissionIssueUrl(repoUrl)
@@ -25,7 +27,7 @@ export function ContributeForm() {
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-            URL de ton dépôt GitHub public
+            {T.contributeFormLabel}
           </label>
           <input
             value={repoUrl}
@@ -41,27 +43,32 @@ export function ContributeForm() {
           className="flex items-center gap-2 rounded-lg bg-[var(--color-brand)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-brand-2)]"
         >
           <GitPullRequest className="size-4" />
-          Préparer la soumission
+          {T.contributeSubmitBtn}
         </button>
       </form>
 
       {issueUrl && (
         <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <p className="mb-2 text-sm text-emerald-200">
-            Ta soumission est prête. Ouvre l'issue pré-remplie pour déclencher
-            l'analyse automatique du dépôt :
-          </p>
+          <p className="mb-2 text-sm text-emerald-200">{T.contributeSuccessText}</p>
           <a
             href={issueUrl}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 text-sm font-medium text-emerald-300 underline"
           >
-            <ExternalLink className="size-4" /> Créer l'issue de soumission
+            <ExternalLink className="size-4" /> {T.contributeIssueLink}
           </a>
           <p className="mt-3 text-xs text-emerald-200/70">
-            Une GitHub Action labellisée <code>repo-submission</code> clonera le
-            dépôt, détectera les hooks et ouvrira une PR sur le registre.
+            {T.contributeNote.split('repo-submission').map((part, i, arr) =>
+              i < arr.length - 1 ? (
+                <span key={i}>
+                  {part}
+                  <code>repo-submission</code>
+                </span>
+              ) : (
+                <span key={i}>{part}</span>
+              )
+            )}
           </p>
         </div>
       )}

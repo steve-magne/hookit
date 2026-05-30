@@ -5,8 +5,10 @@ import { Check, Copy, Download, Trash2 } from 'lucide-react'
 import { useSelection } from '@/store/selection'
 import { allHooks } from '@/lib/hooks'
 import { collectScripts, toSettingsJson } from '@/lib/mergeConfig'
+import { useT } from '@/lib/locale-context'
 
 export function HookConfigurator() {
+  const T = useT()
   const selected = useSelection((s) => s.selected)
   const remove = useSelection((s) => s.remove)
   const clear = useSelection((s) => s.clear)
@@ -35,8 +37,16 @@ export function HookConfigurator() {
   if (hooks.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-8 text-center text-sm text-zinc-500">
-        Sélectionne des hooks (bouton <span className="text-zinc-300">+</span>)
-        pour générer ta configuration <code>settings.json</code>.
+        {T.selectHooksPrompt.split('settings.json').map((part, i, arr) =>
+          i < arr.length - 1 ? (
+            <span key={i}>
+              {part}
+              <code className="text-zinc-300">settings.json</code>
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
       </div>
     )
   }
@@ -45,7 +55,7 @@ export function HookConfigurator() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-lg font-semibold">
-          Configuration générée
+          {T.generatedConfig}
           <span className="ml-2 text-sm font-normal text-zinc-500">
             {hooks.length} hook{hooks.length > 1 ? 's' : ''}
           </span>
@@ -56,7 +66,7 @@ export function HookConfigurator() {
             className="flex items-center gap-2 rounded-lg bg-[var(--color-brand)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--color-brand-2)]"
           >
             {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            {copied ? 'Copié' : 'Copier'}
+            {copied ? T.copied : T.copy}
           </button>
           <button
             onClick={download}
@@ -98,7 +108,7 @@ export function HookConfigurator() {
       {scripts.length > 0 && (
         <div>
           <div className="mb-2 text-xs uppercase tracking-wide text-zinc-500">
-            Scripts à créer ({scripts.length})
+            {T.scriptsToCreate} ({scripts.length})
           </div>
           <div className="space-y-3">
             {scripts.map((s) => (
@@ -111,7 +121,7 @@ export function HookConfigurator() {
             ))}
           </div>
           <p className="mt-2 text-xs text-zinc-500">
-            Pense à rendre les scripts exécutables :{' '}
+            {T.makeExecutable}{' '}
             <code className="text-zinc-400">chmod +x .claude/hooks/*.sh</code>
           </p>
         </div>
