@@ -12,8 +12,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 const VALID_CATEGORIES = ['security', 'context', 'validation', 'notification', 'workflow', 'documentation']
 const VALID_HOOK_TYPES = [
   'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification',
-  'Stop', 'SubagentStop', 'PreCompact', 'SessionStart', 'SessionEnd',
-  'WorktreeCreate',
+  'Stop', 'SubagentStop', 'SubagentStart', 'PreCompact', 'SessionStart', 'SessionEnd',
+  'WorktreeCreate', 'PermissionRequest', 'PostToolUseFailure',
 ]
 
 // Commandes pouvant bloquer l'agent si utilisées en pre-hook sur trigger large

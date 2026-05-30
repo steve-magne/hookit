@@ -3,12 +3,7 @@
 // doublons par slug. Les hooks existants reçoivent l'éventuel exemple
 // communautaire du dépôt source. Écrit le nombre d'ajouts dans
 // /tmp/added-count.txt pour le pipeline CI.
-// Synchronise automatiquement src/data/hooks-seed.json avec le registre.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
+import { readFileSync, writeFileSync } from 'node:fs'
 
 const [, , newFile, registryFile, repoUrl] = process.argv
 if (!newFile || !registryFile) {
@@ -49,10 +44,3 @@ for (const hook of incoming) {
 writeFileSync(registryFile, JSON.stringify(registry, null, 2) + '\n')
 writeFileSync('/tmp/added-count.txt', String(added))
 console.log(`Merged: ${added} nouveau(x) hook(s), ${registry.length} au total.`)
-
-// Synchronise le seed côté client
-const seedFile = resolve(__dirname, '../src/data/hooks-seed.json')
-if (existsSync(seedFile)) {
-  writeFileSync(seedFile, JSON.stringify(registry, null, 2) + '\n')
-  console.log(`Seed synchronisé : ${seedFile}`)
-}

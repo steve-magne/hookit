@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(node .claude/skills/analyze-repo/scripts/apply-best-practices.js*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -77,6 +82,17 @@
           {
             "type": "command",
             "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/typecheck.mjs"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/permission-auto-allow.mjs"
           }
         ]
       }

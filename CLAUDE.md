@@ -14,9 +14,9 @@ npm run preview      # Prévisualisation du build prod
 
 Hookit est un catalogue communautaire de hooks agentiques (Claude Code, GitHub Copilot). POC React + Vite + TypeScript + Tailwind v4.
 
-**Source de données** : `src/data/hooks-seed.json` est la source de vérité côté client. `src/lib/hooks.ts` expose `allHooks` et `filterHooks`. Supabase (via `src/lib/supabase.ts`) est optionnel — il n'active que l'auth GitHub et la persistance des soumissions. Sans `.env`, tout fonctionne en mode seed local.
+**Source de données** : `registry/registry.json` est la seule source de vérité — lue directement par `src/lib/hooks.ts` (via `allHooks`). Supabase (via `src/lib/supabase.ts`) est optionnel — il n'active que l'auth GitHub et la persistance des soumissions. Sans `.env`, tout fonctionne en mode registre local.
 
-**Registre** : `registry/registry.json` est la source canonique du registre versionné. Les scripts `.claude/skills/analyze-repo/scripts/merge-hooks.js` et `.claude/skills/analyze-repo/scripts/extract-json.js` servent au pipeline CI (`.github/workflows/analyze-repo.yml`). L'Action se déclenche sur les issues labellisées `repo-submission` et ouvre une PR `auto-generated` via Claude Code + `ANTHROPIC_API_KEY`.
+**Registre** : `registry/registry.json` est la source canonique et unique du registre versionné — c'est aussi ce que le front-end importe. Les scripts `.claude/skills/analyze-repo/scripts/merge-hooks.js` et `.claude/skills/analyze-repo/scripts/extract-json.js` servent au pipeline CI (`.github/workflows/analyze-repo.yml`). L'Action se déclenche sur les issues labellisées `repo-submission` et ouvre une PR `auto-generated` via Claude Code + `ANTHROPIC_API_KEY`.
 
 **État global** : Zustand persisté dans `src/store/selection.ts` (clé `hookit-selection`) — stocke les slugs des hooks sélectionnés.
 
@@ -28,7 +28,7 @@ Hookit est un catalogue communautaire de hooks agentiques (Claude Code, GitHub C
 
 ## Ajouter un hook au registre
 
-Ajouter une entrée dans `registry/registry.json` **et** dans `src/data/hooks-seed.json` en respectant le type `Hook`. Le champ `implementation.config` doit être un fragment `{ hooks: { [EventName]: [...] } }` directement fusionnable dans `settings.json`.
+Ajouter une entrée dans `registry/registry.json` en respectant le type `Hook`. Le champ `implementation.config` doit être un fragment `{ hooks: { [EventName]: [...] } }` directement fusionnable dans `settings.json`.
 
 ## Conventions hooks Claude Code
 

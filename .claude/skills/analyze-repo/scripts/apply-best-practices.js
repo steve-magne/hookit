@@ -3,7 +3,8 @@
 // Source 1 (toujours) : liste RECOMMENDED_SLUGS depuis le registre.
 // Source 2 (optionnel) : candidats du repo scanné (hooks validés et recommandés).
 // usage: apply-best-practices.js <registry.json> <settings.json> [recommended-hooks.json]
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 const [, , registryFile, settingsFile, candidatesFile] = process.argv
 if (!registryFile || !settingsFile) {
@@ -62,16 +63,22 @@ function hasEquivalentCommand(event, matcher, command) {
 }
 
 // Applique un hook dans settings si sa commande n'est pas déjà présente.
-// checkScriptExists : si true, normalise vers .mjs et vérifie que le script existe localement.
+// writeScript : si true, normalise vers .mjs et crée le script local si absent.
 // Retourne le nom du hook si appliqué, null sinon.
-function applyHook(hook, source, checkScriptExists = false) {
+function applyHook(hook, source, writeScript = false) {
   const fragment = hook.implementation?.config?.hooks
   if (!fragment) return null
 
-  // Pour les hooks du scan : normaliser .sh → .mjs puis vérifier existence locale
-  if (checkScriptExists) {
+  // Pour les hooks du scan : normaliser .sh → .mjs et créer le script si absent
+  if (writeScript) {
     const scriptPath = toMjs(hook.implementation?.script_path)
-    if (scriptPath && !existsSync(scriptPath)) return null
+    const codeSnippet = hook.implementation?.code_snippet
+    if (scriptPath && codeSnippet && !existsSync(scriptPath)) {
+      mkdirSync(dirname(scriptPath), { recursive: true })
+      writeFileSync(scriptPath, codeSnippet, 'utf8')
+    } else if (scriptPath && !codeSnippet && !existsSync(scriptPath)) {
+      return null
+    }
   }
 
   let appliedCount = 0
@@ -81,7 +88,7 @@ function applyHook(hook, source, checkScriptExists = false) {
       const matcher = entry.matcher ?? '*'
       for (const h of entry.hooks ?? []) {
         // Normaliser la commande vers .mjs pour les hooks du scan
-        const command = checkScriptExists ? toMjs(h.command) : h.command
+        const command = writeScript ? toMjs(h.command) : h.command
         const key = `${event}:${matcher}:${command}`
         if (existingCommands.has(key)) continue
         // Éviter les doublons fonctionnels (même script, extension .sh vs .mjs)
@@ -119,7 +126,7 @@ if (candidatesFile && existsSync(candidatesFile)) {
   for (const hook of candidates) {
     // Skip les slugs déjà couverts par RECOMMENDED_SLUGS pour éviter le double affichage
     if (RECOMMENDED_SLUGS.includes(hook.slug)) continue
-    const name = applyHook(hook, 'scan', true)  // vérifie que le script existe localement
+    const name = applyHook(hook, 'scan', true)  // crée le script .mjs local si absent
     if (name) { appliedFromScan++; namesFromScan.push(name) }
   }
 }

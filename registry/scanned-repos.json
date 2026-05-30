@@ -30,5 +30,13 @@
     "hooks_found": 9,
     "hooks_added": 2,
     "status": "success"
+  },
+  {
+    "url": "https://github.com/disler/claude-code-hooks-mastery",
+    "name": "disler/claude-code-hooks-mastery",
+    "scanned_at": "2026-05-30T09:38:39.311Z",
+    "hooks_found": 16,
+    "hooks_added": 11,
+    "status": "success"
   }
 ]

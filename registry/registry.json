@@ -35,7 +35,13 @@
       "script_path": ".claude/hooks/detect-secrets.sh",
       "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\ncommand=$(echo \"$input\" | jq -r '.tool_input.command // \"\"')\nif echo \"$command\" | grep -qiE '(sk-[a-z0-9]{20,}|ghp_[a-z0-9]{36}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----|password=)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Secret potentiel détecté dans la commande shell.\"}}'\n  exit 0\nfi\nexit 0\n"
     },
-    "community_examples": [],
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/detect-secrets.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
     "tags": [
       "security",
       "bash",
@@ -80,7 +86,13 @@
       "script_path": ".claude/hooks/block-destructive.sh",
       "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\ncommand=$(echo \"$input\" | jq -r '.tool_input.command // \"\"')\nif echo \"$command\" | grep -qiE '(rm[[:space:]]+-rf[[:space:]]+/|mkfs|dd[[:space:]]+if=.*of=/dev/|:\\(\\)\\{|chmod[[:space:]]+-R[[:space:]]+777[[:space:]]+/)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Commande destructive bloquée par le hook de sécurité.\"}}'\n  exit 0\nfi\nexit 0\n"
     },
-    "community_examples": [],
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/block-destructive.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
     "tags": [
       "security",
       "bash",
@@ -125,7 +137,13 @@
       "script_path": ".claude/hooks/protect-paths.sh",
       "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\npath=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif echo \"$path\" | grep -qiE '(\\.env($|\\.)|/secrets/|\\.pem$|id_rsa|credentials)'; then\n  echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Fichier protégé — édition refusée par le hook.\"}}'\n  exit 0\nfi\nexit 0\n"
     },
-    "community_examples": [],
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/protect-paths.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
     "tags": [
       "security",
       "files",
@@ -258,7 +276,13 @@
       "script_path": ".claude/hooks/load-git-context.sh",
       "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$CLAUDE_PROJECT_DIR\"\necho \"### Contexte Git\"\necho \"Branche: $(git branch --show-current 2>/dev/null || echo n/a)\"\necho \"Statut:\"\ngit status --short 2>/dev/null | head -20\necho \"Derniers commits:\"\ngit log --oneline -5 2>/dev/null\nexit 0\n"
     },
-    "community_examples": [],
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/session-start-git.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
     "tags": [
       "context",
       "git",
@@ -568,7 +592,13 @@
       "script_path": ".claude/hooks/audit-log.sh",
       "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\ninput=$(cat)\nreason=$(echo \"$input\" | jq -r '.reason // \"unknown\"')\nlog=\"$CLAUDE_PROJECT_DIR/.claude/session-audit.log\"\necho \"$(date -u +%Y-%m-%dT%H:%M:%SZ) session_end reason=$reason cwd=$CLAUDE_PROJECT_DIR\" >> \"$log\"\nexit 0\n"
     },
-    "community_examples": [],
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/session-end-log.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
     "tags": [
       "notification",
       "audit",
@@ -1223,6 +1253,566 @@
       "validation",
       "frontend",
       "definition-of-done"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "notification-tts-voice",
+    "slug": "notification-tts-voice",
+    "name": "Notification vocale TTS",
+    "category": "notification",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "Notification",
+    "trigger": "*",
+    "description": "Annonce vocalement via la synthèse vocale système (say/espeak) quand l'agent a besoin de l'attention de l'utilisateur.",
+    "use_cases": [
+      "Alerter l'utilisateur en mode autonome longue durée",
+      "Notification sonore quand l'agent attend une validation"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "Notification": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/notification-tts.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/notification-tts.mjs",
+      "code_snippet": "import { readFileSync } from 'fs';\nimport { execSync } from 'child_process';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst engineerName = (process.env.ENGINEER_NAME || '').trim();\nconst personalized = engineerName && Math.random() < 0.3;\nconst msg = personalized\n  ? `${engineerName}, your agent needs your input`\n  : 'Your agent needs your input';\n\ntry {\n  if (process.platform === 'darwin') {\n    execSync(`say \"${msg.replace(/\"/g, '')}\"`, { timeout: 10000, stdio: 'ignore' });\n  } else {\n    execSync(`espeak \"${msg.replace(/\"/g, '')}\"`, { timeout: 10000, stdio: 'ignore' });\n  }\n} catch {}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/notification-tts.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "tts",
+      "notification",
+      "voice",
+      "audio",
+      "attention"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "stop-tts-completion",
+    "slug": "stop-tts-completion",
+    "name": "Annonce vocale de fin de tâche",
+    "category": "notification",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "Stop",
+    "trigger": "*",
+    "description": "Annonce vocalement via TTS que l'agent a terminé sa tâche, avec un message de complétion aléatoire.",
+    "use_cases": [
+      "Notifier sans regarder l'écran quand la tâche est finie",
+      "Feedback audio en fin de session longue"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "Stop": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/stop-tts.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/stop-tts.mjs",
+      "code_snippet": "import { readFileSync } from 'fs';\nimport { execSync } from 'child_process';\n\nJSON.parse(readFileSync(0, 'utf8'));\nconst messages = ['Work complete!', 'All done!', 'Task finished!', 'Job complete!', 'Ready for next task!'];\nconst msg = messages[Math.floor(Math.random() * messages.length)];\n\ntry {\n  if (process.platform === 'darwin') {\n    execSync(`say \"${msg}\"`, { timeout: 10000, stdio: 'ignore' });\n  } else {\n    execSync(`espeak \"${msg}\"`, { timeout: 10000, stdio: 'ignore' });\n  }\n} catch {}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/stop-tts.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "tts",
+      "stop",
+      "voice",
+      "completion",
+      "audio"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "subagent-start-tts-announce",
+    "slug": "subagent-start-tts-announce",
+    "name": "Annonce vocale de démarrage de sous-agent",
+    "category": "notification",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "SubagentStart",
+    "trigger": "*",
+    "description": "Annonce vocalement via TTS quand un sous-agent démarre, pour suivre l'activité parallèle des agents.",
+    "use_cases": [
+      "Traçabilité audio des agents parallèles",
+      "Suivi sans interface visuelle du démarrage de sous-agents"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SubagentStart": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/subagent-start-tts.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/subagent-start-tts.mjs",
+      "code_snippet": "import { readFileSync } from 'fs';\nimport { execSync } from 'child_process';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst agentName = input.agent_name || '';\nconst msg = agentName ? `Subagent ${agentName} started` : 'Subagent started';\n\ntry {\n  if (process.platform === 'darwin') {\n    execSync(`say \"${msg.replace(/\"/g, '')}\"`, { timeout: 10000, stdio: 'ignore' });\n  } else {\n    execSync(`espeak \"${msg.replace(/\"/g, '')}\"`, { timeout: 10000, stdio: 'ignore' });\n  }\n} catch {}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/subagent-start-tts.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "tts",
+      "subagent",
+      "voice",
+      "parallel-agents",
+      "audio"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "subagent-stop-tts-summary",
+    "slug": "subagent-stop-tts-summary",
+    "name": "Résumé vocal de fin de sous-agent",
+    "category": "notification",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "SubagentStop",
+    "trigger": "*",
+    "description": "Annonce la fin d'un sous-agent avec un message vocal. Utilise un verrou de fichier pour éviter les chevauchements TTS quand plusieurs sous-agents se terminent en parallèle.",
+    "use_cases": [
+      "Suivi audio des tâches parallèles complétées",
+      "Annonce ordonnée de fin de sous-agents sans collision sonore"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SubagentStop": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/subagent-stop-tts.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/subagent-stop-tts.mjs",
+      "code_snippet": "import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';\nimport { join } from 'path';\nimport { execSync } from 'child_process';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst agentName = input.agent_name || '';\nconst lockDir = join(process.cwd(), '.claude', 'data', 'tts_queue');\nconst lockFile = join(lockDir, 'tts.lock');\nmkdirSync(lockDir, { recursive: true });\n\nconst deadline = Date.now() + 30000;\nwhile (existsSync(lockFile) && Date.now() < deadline) {\n  try { execSync('sleep 0.1', { stdio: 'ignore', timeout: 200 }); } catch { break; }\n}\ntry { writeFileSync(lockFile, JSON.stringify({ pid: process.pid, ts: new Date().toISOString() })); } catch {}\n\nconst messages = ['Subagent complete', 'Agent task done', 'Subagent finished'];\nconst base = messages[Math.floor(Math.random() * messages.length)];\nconst msg = agentName ? `${agentName} complete` : base;\n\ntry {\n  if (process.platform === 'darwin') {\n    execSync(`say \"${msg.replace(/\"/g, '')}\"`, { timeout: 10000, stdio: 'ignore' });\n  } else {\n    execSync(`espeak \"${msg.replace(/\"/g, '')}\"`, { timeout: 10000, stdio: 'ignore' });\n  }\n} finally {\n  try { unlinkSync(lockFile); } catch {}\n}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/subagent-stop-tts.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "tts",
+      "subagent",
+      "voice",
+      "parallel-agents",
+      "locking",
+      "audio"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "user-prompt-log-session",
+    "slug": "user-prompt-log-session",
+    "name": "Journal des prompts par session",
+    "category": "context",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "UserPromptSubmit",
+    "trigger": "*",
+    "description": "Persiste chaque prompt utilisateur dans un fichier JSON par session, permettant de retrouver l'historique des échanges.",
+    "use_cases": [
+      "Audit des prompts soumis par session",
+      "Rejouer ou analyser une session passée"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-log.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/user-prompt-log.mjs",
+      "code_snippet": "import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';\nimport { join } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst sessionId = input.session_id || 'unknown';\nconst sessionsDir = join(process.cwd(), '.claude', 'data', 'sessions');\nmkdirSync(sessionsDir, { recursive: true });\nconst sessionFile = join(sessionsDir, `${sessionId}.json`);\n\nlet sessionData = { session_id: sessionId, prompts: [] };\nif (existsSync(sessionFile)) {\n  try { sessionData = JSON.parse(readFileSync(sessionFile, 'utf8')); } catch {}\n}\nsessionData.prompts = sessionData.prompts || [];\nsessionData.prompts.push({ prompt: input.prompt, timestamp: new Date().toISOString() });\nwriteFileSync(sessionFile, JSON.stringify(sessionData, null, 2));"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/user-prompt-log.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "logging",
+      "session",
+      "audit",
+      "prompt",
+      "history"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "user-prompt-llm-agent-name",
+    "slug": "user-prompt-llm-agent-name",
+    "name": "Nommage automatique de session",
+    "category": "context",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "UserPromptSubmit",
+    "trigger": "*",
+    "description": "Génère automatiquement un nom créatif en un mot pour chaque session (ex : Phoenix, Sage, Nova) au premier prompt, pour un suivi plus humain des sessions.",
+    "use_cases": [
+      "Identifier les sessions dans les logs par un nom mémorable",
+      "Personnaliser les annonces TTS de sous-agents"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-name-agent.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/user-prompt-name-agent.mjs",
+      "code_snippet": "import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';\nimport { join } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst sessionId = input.session_id || 'unknown';\nconst sessionsDir = join(process.cwd(), '.claude', 'data', 'sessions');\nmkdirSync(sessionsDir, { recursive: true });\nconst sessionFile = join(sessionsDir, `${sessionId}.json`);\n\nlet sessionData = { session_id: sessionId };\nif (existsSync(sessionFile)) {\n  try { sessionData = JSON.parse(readFileSync(sessionFile, 'utf8')); } catch {}\n}\n\nif (!sessionData.agent_name && input.prompt) {\n  const fallback = ['Phoenix', 'Sage', 'Nova', 'Echo', 'Atlas', 'Cipher', 'Nexus', 'Oracle', 'Aurora', 'Vortex'];\n  sessionData.agent_name = fallback[Math.floor(Math.random() * fallback.length)];\n  writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));\n}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/user-prompt-name-agent.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "session",
+      "naming",
+      "agent",
+      "identity",
+      "personalization"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "pre-compact-transcript-backup",
+    "slug": "pre-compact-transcript-backup",
+    "name": "Sauvegarde du transcript avant compaction",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "PreCompact",
+    "trigger": "*",
+    "description": "Sauvegarde automatiquement le fichier transcript JSONL avant chaque compaction de contexte, pour permettre l'audit ou la restauration.",
+    "use_cases": [
+      "Conserver un historique complet avant compaction",
+      "Audit des sessions longues"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PreCompact": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-backup.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/pre-compact-backup.mjs",
+      "code_snippet": "import { readFileSync, copyFileSync, mkdirSync, existsSync } from 'fs';\nimport { join, basename } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst transcriptPath = input.transcript_path || '';\nconst trigger = input.trigger || 'unknown';\n\nif (transcriptPath && existsSync(transcriptPath)) {\n  const backupDir = join(process.cwd(), 'logs', 'transcript_backups');\n  mkdirSync(backupDir, { recursive: true });\n  const timestamp = new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);\n  const stem = basename(transcriptPath).replace(/\\.jsonl$/, '');\n  const dest = join(backupDir, `${stem}_pre_compact_${trigger}_${timestamp}.jsonl`);\n  try { copyFileSync(transcriptPath, dest); } catch {}\n}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/pre-compact-backup.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "backup",
+      "compact",
+      "transcript",
+      "context",
+      "audit"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "permission-request-auto-allow-readonly",
+    "slug": "permission-request-auto-allow-readonly",
+    "name": "Auto-approbation des permissions lecture seule",
+    "category": "security",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "PermissionRequest",
+    "trigger": "*",
+    "description": "Approuve automatiquement les demandes de permission pour les opérations en lecture seule (Read, Glob, Grep, commandes Bash sûres) sans intervention manuelle.",
+    "use_cases": [
+      "Réduire les interruptions pour les opérations non-destructives",
+      "Politique de sécurité automatisée basée sur la sûreté des commandes"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PermissionRequest": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/permission-auto-allow.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/permission-auto-allow.mjs",
+      "code_snippet": "import { readFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst toolName = input.tool_name || '';\nconst toolInput = input.tool_input || {};\n\nconst SAFE_BASH = [\n  /^ls/, /^pwd/, /^echo/, /^cat(?!.*>)/, /^head/, /^tail/, /^wc/,\n  /^which/, /^whereis/, /^file/, /^stat/,\n  /^git\\s+(status|log|diff|show|branch|tag)/,\n  /^npm\\s+(list|ls|outdated|view)/\n];\n\nconst readOnlyTools = ['Read', 'Glob', 'Grep'];\nlet allow = readOnlyTools.includes(toolName);\n\nif (!allow && toolName === 'Bash') {\n  const cmd = (toolInput.command || '').trim();\n  allow = SAFE_BASH.some(p => p.test(cmd));\n}\n\nif (allow) {\n  process.stdout.write(JSON.stringify({\n    hookSpecificOutput: {\n      hookEventName: 'PermissionRequest',\n      decision: { behavior: 'allow' }\n    }\n  }));\n}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/permission-auto-allow.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "permission",
+      "security",
+      "auto-allow",
+      "readonly",
+      "policy"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "post-tool-failure-log",
+    "slug": "post-tool-failure-log",
+    "name": "Journal structuré des échecs d'outils",
+    "category": "context",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "PostToolUseFailure",
+    "trigger": "*",
+    "description": "Enregistre chaque échec d'outil dans un fichier JSON structuré avec horodatage, nom d'outil, input et erreur, pour le débogage et l'audit.",
+    "use_cases": [
+      "Débogage des outils qui échouent en session autonome",
+      "Détection de patterns d'échec récurrents"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "PostToolUseFailure": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-failure-log.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/post-tool-failure-log.mjs",
+      "code_snippet": "import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';\nimport { join } from 'path';\n\nconst input = JSON.parse(readFileSync(0, 'utf8'));\nconst logDir = join(process.cwd(), 'logs');\nmkdirSync(logDir, { recursive: true });\nconst logPath = join(logDir, 'tool_failures.json');\n\nconst entry = {\n  timestamp: new Date().toISOString(),\n  session_id: input.session_id || '',\n  tool_name: input.tool_name || 'unknown',\n  tool_use_id: input.tool_use_id || '',\n  tool_input: input.tool_input || {},\n  error: input.error || {}\n};\n\nlet log = [];\nif (existsSync(logPath)) {\n  try { log = JSON.parse(readFileSync(logPath, 'utf8')); } catch {}\n}\nlog.push(entry);\nwriteFileSync(logPath, JSON.stringify(log, null, 2));"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/post-tool-failure-log.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "logging",
+      "debugging",
+      "failure",
+      "audit",
+      "error-tracking"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "setup-check-install-deps",
+    "slug": "setup-check-install-deps",
+    "name": "Vérification et installation des dépendances au démarrage",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "SessionStart",
+    "trigger": "*",
+    "description": "Vérifie la présence des outils système nécessaires et installe automatiquement les dépendances du projet (npm ci, uv sync) au démarrage de la session.",
+    "use_cases": [
+      "Environnement toujours prêt dès l'ouverture d'une session",
+      "Onboarding automatique sur un nouveau projet"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/setup-check-deps.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/setup-check-deps.mjs",
+      "code_snippet": "import { readFileSync, existsSync } from 'fs';\nimport { execSync } from 'child_process';\n\nJSON.parse(readFileSync(0, 'utf8'));\n\nfunction available(cmd) {\n  try { execSync(`which ${cmd}`, { stdio: 'ignore', timeout: 3000 }); return true; } catch { return false; }\n}\n\nfor (const dep of ['node', 'git']) {\n  if (!available(dep)) process.stderr.write(`Warning: ${dep} not found in PATH\\n`);\n}\n\nif (existsSync('package.json') && existsSync('package-lock.json')) {\n  try { execSync('npm ci --prefer-offline', { timeout: 60000, stdio: 'ignore' }); } catch {\n    try { execSync('npm install', { timeout: 60000, stdio: 'ignore' }); } catch {}\n  }\n} else if (existsSync('pyproject.toml') || existsSync('uv.lock')) {\n  try { execSync('uv sync', { timeout: 60000, stdio: 'ignore' }); } catch {}\n}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/setup-check-deps.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "setup",
+      "dependencies",
+      "onboarding",
+      "npm",
+      "uv",
+      "install"
+    ],
+    "votes": 0
+  },
+  {
+    "id": "session-end-cleanup-temp",
+    "slug": "session-end-cleanup-temp",
+    "name": "Nettoyage des fichiers temporaires en fin de session",
+    "category": "workflow",
+    "provider": [
+      "claude-code"
+    ],
+    "hook_type": "SessionEnd",
+    "trigger": "*",
+    "description": "Supprime automatiquement les fichiers temporaires (.tmp) et les artefacts périmés du répertoire logs en fin de session.",
+    "use_cases": [
+      "Maintenir un répertoire logs propre sans intervention manuelle",
+      "Libérer de l'espace disque en fin de session longue"
+    ],
+    "implementation": {
+      "type": "settings_json",
+      "config": {
+        "hooks": {
+          "SessionEnd": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-end-cleanup.mjs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "script_path": ".claude/hooks/session-end-cleanup.mjs",
+      "code_snippet": "import { readFileSync, readdirSync, unlinkSync, statSync } from 'fs';\nimport { join } from 'path';\n\nJSON.parse(readFileSync(0, 'utf8'));\nconst logDir = join(process.cwd(), 'logs');\n\ntry {\n  const files = readdirSync(logDir);\n  for (const f of files) {\n    const fullPath = join(logDir, f);\n    if (f.endsWith('.tmp')) {\n      try { unlinkSync(fullPath); } catch {}\n    }\n    if (f === 'chat.json') {\n      try {\n        const age = Date.now() - statSync(fullPath).mtimeMs;\n        if (age > 86400000) unlinkSync(fullPath);\n      } catch {}\n    }\n  }\n} catch {}"
+    },
+    "community_examples": [
+      {
+        "repo": "https://github.com/disler/claude-code-hooks-mastery",
+        "file_path": ".claude/hooks/session-end-cleanup.mjs",
+        "added_by": "claude-code-analysis"
+      }
+    ],
+    "tags": [
+      "cleanup",
+      "session",
+      "temp-files",
+      "maintenance"
     ],
     "votes": 0
   }

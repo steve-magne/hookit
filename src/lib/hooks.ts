@@ -1,9 +1,7 @@
-import seed from '../data/hooks-seed.json'
+import registry from '../../registry/registry.json'
 import type { Category, Hook, HookType, Provider } from '../types/hook'
 
-// Source de vérité côté client pour le POC : le seed local.
-// (Brancher Supabase ici ultérieurement sans changer l'API publique.)
-export const allHooks = seed as Hook[]
+export const allHooks = registry as Hook[]
 
 export function getHookBySlug(slug: string): Hook | undefined {
   return allHooks.find((h) => h.slug === slug)
